@@ -164,7 +164,7 @@ class RabinChunkerGUI:
             
             if algorithm in ["gear", "both"]:
                 self.gear_chunker = GearChunker(min_size=min_size, avg_size=avg_size, 
-                                          max_size=max_size, window_mode=window_mode)
+                                          max_size=max_size)
                 self.gear_chunks = self.gear_chunker.chunk_data(data)
                 self.gear_stats, self.gear_sizes = self.gear_chunker.analyze_chunks(self.gear_chunks)
             
