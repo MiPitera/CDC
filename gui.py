@@ -233,6 +233,17 @@ RABIN FINGERPRINTING STATISTICS
             accuracy = (self.rabin_stats['avg_chunk'] / self.rabin_stats['target_avg'] * 100) if self.rabin_stats['target_avg'] > 0 else 0
             output += f"   Target Accuracy:  {accuracy:.1f}%\n"
             
+            # Deduplication statistics
+            output += f"\n💾 Deduplication:\n"
+            output += f"   Total Chunks:     {self.rabin_stats['num_chunks']}\n"
+            output += f"   Unique Chunks:    {self.rabin_stats['unique_chunks']}\n"
+            output += f"   Duplicate Chunks: {self.rabin_stats['num_chunks'] - self.rabin_stats['unique_chunks']}\n"
+            output += f"   Total Size:       {self.rabin_stats['total_size']:,} bytes\n"
+            output += f"   Unique Size:      {self.rabin_stats['unique_size']:,} bytes\n"
+            output += f"   Dedup Ratio:      {self.rabin_stats['dedup_rate']:.2f}x\n"
+            savings = (1 - self.rabin_stats['unique_size'] / self.rabin_stats['total_size']) * 100 if self.rabin_stats['total_size'] > 0 else 0
+            output += f"   Space Savings:    {savings:.1f}%\n"
+            
             # Size distribution
             bins = [self.rabin_chunker.min_size, self.rabin_stats['target_avg'], self.rabin_chunker.max_size]
             hist, _ = np.histogram(self.rabin_sizes, bins=bins)
@@ -266,6 +277,17 @@ GEAR HASHING STATISTICS
             
             accuracy = (self.gear_stats['avg_chunk'] / self.gear_stats['target_avg'] * 100) if self.gear_stats['target_avg'] > 0 else 0
             output += f"   Target Accuracy:  {accuracy:.1f}%\n"
+            
+            # Deduplication statistics
+            output += f"\n💾 Deduplication:\n"
+            output += f"   Total Chunks:     {self.gear_stats['num_chunks']}\n"
+            output += f"   Unique Chunks:    {self.gear_stats['unique_chunks']}\n"
+            output += f"   Duplicate Chunks: {self.gear_stats['num_chunks'] - self.gear_stats['unique_chunks']}\n"
+            output += f"   Total Size:       {self.gear_stats['total_size']:,} bytes\n"
+            output += f"   Unique Size:      {self.gear_stats['unique_size']:,} bytes\n"
+            output += f"   Dedup Ratio:      {self.gear_stats['dedup_rate']:.2f}x\n"
+            savings = (1 - self.gear_stats['unique_size'] / self.gear_stats['total_size']) * 100 if self.gear_stats['total_size'] > 0 else 0
+            output += f"   Space Savings:    {savings:.1f}%\n"
             
             # Size distribution
             bins = [self.gear_chunker.min_size, self.gear_stats['target_avg'], self.gear_chunker.max_size]
@@ -305,6 +327,17 @@ FASTCDC STATISTICS
             
             accuracy = (self.fastcdc_stats['avg_chunk'] / self.fastcdc_stats['target_avg'] * 100) if self.fastcdc_stats['target_avg'] > 0 else 0
             output += f"   Target Accuracy:  {accuracy:.1f}%\n"
+            
+            # Deduplication statistics
+            output += f"\n💾 Deduplication:\n"
+            output += f"   Total Chunks:     {self.fastcdc_stats['num_chunks']}\n"
+            output += f"   Unique Chunks:    {self.fastcdc_stats['unique_chunks']}\n"
+            output += f"   Duplicate Chunks: {self.fastcdc_stats['num_chunks'] - self.fastcdc_stats['unique_chunks']}\n"
+            output += f"   Total Size:       {self.fastcdc_stats['total_size']:,} bytes\n"
+            output += f"   Unique Size:      {self.fastcdc_stats['unique_size']:,} bytes\n"
+            output += f"   Dedup Ratio:      {self.fastcdc_stats['dedup_rate']:.2f}x\n"
+            savings = (1 - self.fastcdc_stats['unique_size'] / self.fastcdc_stats['total_size']) * 100 if self.fastcdc_stats['total_size'] > 0 else 0
+            output += f"   Space Savings:    {savings:.1f}%\n"
             
             # Size distribution
             bins = [self.fastcdc_chunker.min_size, self.fastcdc_stats['target_avg'], self.fastcdc_chunker.max_size]

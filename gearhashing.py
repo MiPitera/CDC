@@ -56,12 +56,20 @@ class GearChunker:
     
     def analyze_chunks(self, chunks):
         """Calculate statistics for chunked data."""
-        import numpy as np
         sizes = [len(chunk) for chunk in chunks]
         
+        unique_chunks = set(chunks)
+        unique_size = sum(len(chunk) for chunk in unique_chunks)
+        total_size = sum(sizes)
+        
+        dedup_rate = total_size / unique_size if unique_size > 0 else 1.0
+
         stats = {
             'num_chunks': len(chunks),
-            'total_size': sum(sizes),
+            'unique_chunks': len(unique_chunks), 
+            'total_size': total_size,
+            'unique_size': unique_size,          
+            'dedup_rate': dedup_rate,            
             'min_chunk': min(sizes) if sizes else 0,
             'max_chunk': max(sizes) if sizes else 0,
             'avg_chunk': np.mean(sizes) if sizes else 0,
