@@ -7,31 +7,28 @@ class GearHashing:
         self.hash = 0
 
     def _initialize_gear_table(self):
-        return [s.randbits(self.window_size-1) for _ in range(256)] 
+        return [s.randbits(self.window_size) for _ in range(256)] 
 
     def compute_hash(self, data):
         data = data.encode('utf-8')     
         for byte in data:
-            self.hash = ((self.hash << 1) + self.gear_table[byte]) &  ((1 << ((self.window_size-1).bit_length())) - 1)
+            self.hash = ((self.hash << 1) + self.gear_table[byte]) & ((1 << self.window_size) - 1)
         return self.hash
     def reset_hash(self):
         self.hash = 0
         return self.hash
     
     def hash_expand(self, new_byte: int):
-        self.hash = ((self.hash << 1) + self.gear_table[new_byte]) &  ((1 << ((self.window_size-1).bit_length())) - 1)
-        return self.hash        
+        self.hash = ((self.hash << 1) + self.gear_table[new_byte]) & ((1 << self.window_size) - 1)
+        return self.hash  
     
 
 
 class GearChunker:
-    def __init__(self, min_size=2048, avg_size=8192, max_size=16384,window_mode='sqrt'):
+    def __init__(self, min_size=2048, avg_size=8192, max_size=16384):
         
-        if window_mode == 'log':
-            self.window_size = (avg_size-1).bit_length()
-        else : 
-            self.window_size = int(np.sqrt(avg_size))   
-        self.gear = GearHashing(window_size=self.window_size*8)
+        self.window_size = 64
+        self.gear = GearHashing(window_size=64)
         self.min_size = min_size
         self.avg_size = avg_size
         self.max_size = max_size
