@@ -11,7 +11,7 @@ from fastCDC import fastCDC
 class RabinChunkerGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("CDC Chunker Comparison - Rabin vs Gear")
+        self.root.title("CDC Chunker Comparison - Rabin vs Gear vs FastCDC")
         self.root.geometry("1400x900")
         
         self.rabin_chunker = None
