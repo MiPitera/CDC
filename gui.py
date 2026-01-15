@@ -6,6 +6,7 @@ from matplotlib.figure import Figure
 import numpy as np
 from rabinfingerprint import RabinChunker
 from gearhashing import GearChunker
+from fastCDC import fastCDC
 
 class RabinChunkerGUI:
     def __init__(self, root):
@@ -15,12 +16,16 @@ class RabinChunkerGUI:
         
         self.rabin_chunker = None
         self.gear_chunker = None
+        self.fastcdc_chunker = None
         self.rabin_chunks = []
         self.gear_chunks = []
+        self.fastcdc_chunks = []
         self.rabin_stats = {}
         self.gear_stats = {}
+        self.fastcdc_stats = {}
         self.rabin_sizes = []
         self.gear_sizes = []
+        self.fastcdc_sizes = []
         
         self.create_widgets()
         
@@ -54,24 +59,29 @@ class RabinChunkerGUI:
         self.max_size_var = tk.IntVar(value=16384)
         ttk.Entry(params_frame, textvariable=self.max_size_var, width=15).grid(row=0, column=5, padx=5, pady=5)
         
-        # Window Mode
+        # Window Mode (for Rabin only)
         ttk.Label(params_frame, text="Window Mode:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
         self.window_mode_var = tk.StringVar(value="sqrt")
         window_combo = ttk.Combobox(params_frame, textvariable=self.window_mode_var, 
                                      values=["sqrt", "log"], width=12, state="readonly")
         window_combo.grid(row=1, column=1, padx=5, pady=5)
         
+        # Norm Level (for FastCDC only)
+        ttk.Label(params_frame, text="Norm Level:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        self.norm_level_var = tk.IntVar(value=3)
+        ttk.Entry(params_frame, textvariable=self.norm_level_var, width=15).grid(row=2, column=1, padx=5, pady=5)
+        
         # Algorithm Selection
-        ttk.Label(params_frame, text="Algorithm:").grid(row=1, column=2, sticky=tk.W, padx=5, pady=5)
-        self.algorithm_var = tk.StringVar(value="both")
+        ttk.Label(params_frame, text="Algorithm:").grid(row=2, column=2, sticky=tk.W, padx=5, pady=5)
+        self.algorithm_var = tk.StringVar(value="all")
         algo_combo = ttk.Combobox(params_frame, textvariable=self.algorithm_var, 
-                                   values=["rabin", "gear", "both"], width=12, state="readonly")
-        algo_combo.grid(row=1, column=3, padx=5, pady=5)
+                                   values=["rabin", "gear", "fastcdc", "all"], width=12, state="readonly")
+        algo_combo.grid(row=2, column=3, padx=5, pady=5)
         
         # Buttons
-        ttk.Button(params_frame, text="Load File", command=self.load_file).grid(row=1, column=4, padx=5, pady=5)
-        ttk.Button(params_frame, text="Chunk Data", command=self.chunk_data).grid(row=1, column=5, padx=5, pady=5)
-        ttk.Button(params_frame, text="Clear", command=self.clear_results).grid(row=1, column=6, padx=5, pady=5)
+        ttk.Button(params_frame, text="Load File", command=self.load_file).grid(row=2, column=4, padx=5, pady=5)
+        ttk.Button(params_frame, text="Chunk Data", command=self.chunk_data).grid(row=2, column=5, padx=5, pady=5)
+        ttk.Button(params_frame, text="Clear", command=self.clear_results).grid(row=2, column=6, padx=5, pady=5)
         
         # ===== Left Panel: Text Input/Output =====
         left_frame = ttk.Frame(main_frame)
@@ -156,17 +166,24 @@ class RabinChunkerGUI:
                 return
             
             # Run selected algorithm(s)
-            if algorithm in ["rabin", "both"]:
+            if algorithm in ["rabin", "all"]:
                 self.rabin_chunker = RabinChunker(min_size=min_size, avg_size=avg_size, 
                                            max_size=max_size, window_mode=window_mode)
                 self.rabin_chunks = self.rabin_chunker.chunk_data(data)
                 self.rabin_stats, self.rabin_sizes = self.rabin_chunker.analyze_chunks(self.rabin_chunks)
             
-            if algorithm in ["gear", "both"]:
+            if algorithm in ["gear", "all"]:
                 self.gear_chunker = GearChunker(min_size=min_size, avg_size=avg_size, 
                                           max_size=max_size)
                 self.gear_chunks = self.gear_chunker.chunk_data(data)
                 self.gear_stats, self.gear_sizes = self.gear_chunker.analyze_chunks(self.gear_chunks)
+            
+            if algorithm in ["fastcdc", "all"]:
+                norm_level = self.norm_level_var.get()
+                self.fastcdc_chunker = fastCDC(min_size=min_size, avg_size=avg_size, 
+                                          max_size=max_size, norm_level=norm_level)
+                self.fastcdc_chunks = self.fastcdc_chunker.chunk_data(data)
+                self.fastcdc_stats, self.fastcdc_sizes = self.fastcdc_chunker.analyze_chunks(self.fastcdc_chunks)
             
             # Update UI
             self.display_statistics()
@@ -175,10 +192,12 @@ class RabinChunkerGUI:
             self.update_chunk_spinbox()
             
             msg = []
-            if algorithm in ["rabin", "both"]:
+            if algorithm in ["rabin", "all"]:
                 msg.append(f"Rabin: {len(self.rabin_chunks)} chunks")
-            if algorithm in ["gear", "both"]:
+            if algorithm in ["gear", "all"]:
                 msg.append(f"Gear: {len(self.gear_chunks)} chunks")
+            if algorithm in ["fastcdc", "all"]:
+                msg.append(f"FastCDC: {len(self.fastcdc_chunks)} chunks")
             messagebox.showinfo("Success", " | ".join(msg))
             
         except Exception as e:
@@ -257,31 +276,79 @@ GEAR HASHING STATISTICS
             output += f"   ≥ {self.gear_stats['target_avg']:,} bytes:  {hist[1]:3d} chunks ({hist[1]/self.gear_stats['num_chunks']*100:.1f}%)\n"
             output += f"\n{'='*50}\n\n"
         
-        # Display comparison if both algorithms were run
-        if self.rabin_stats and self.gear_stats:
+        # Display FastCDC statistics if available
+        if self.fastcdc_stats:
             output += f"""{'='*50}
-COMPARISON: RABIN vs GEAR
+FASTCDC STATISTICS
 {'='*50}
 
-📊 Chunk Count:
-   Rabin: {self.rabin_stats['num_chunks']} chunks
-   Gear:  {self.gear_stats['num_chunks']} chunks
-   Difference: {abs(self.rabin_stats['num_chunks'] - self.gear_stats['num_chunks'])} chunks
+📊 Configuration:
+   Hash Length:      {self.fastcdc_chunker.hash_lenght} bits
+   Target Avg Size:  {self.fastcdc_stats['target_avg']:,} bytes
+   Min/Max Bounds:   {self.fastcdc_chunker.min_size:,} / {self.fastcdc_chunker.max_size:,} bytes
+   Normalized Size:  {self.fastcdc_chunker.normalized_size:,} bytes
+   Norm Level:       {self.fastcdc_chunker.norm_level}
+   Large Mask Bits:  {self.fastcdc_chunker.large_mask_bits}
+   Small Mask Bits:  {self.fastcdc_chunker.small_mask_bits}
+   Large Mask:       0x{self.fastcdc_chunker.large_mask:X}
+   Small Mask:       0x{self.fastcdc_chunker.small_mask:X}
 
-📏 Average Chunk Size:
-   Rabin: {self.rabin_stats['avg_chunk']:.2f} bytes
-   Gear:  {self.gear_stats['avg_chunk']:.2f} bytes
-   Difference: {abs(self.rabin_stats['avg_chunk'] - self.gear_stats['avg_chunk']):.2f} bytes
+📈 Results:
+   Total Data Size:  {self.fastcdc_stats['total_size']:,} bytes
+   Number of Chunks: {self.fastcdc_stats['num_chunks']}
+   Smallest Chunk:   {self.fastcdc_stats['min_chunk']:,} bytes
+   Largest Chunk:    {self.fastcdc_stats['max_chunk']:,} bytes
+   Average Size:     {self.fastcdc_stats['avg_chunk']:.2f} bytes
+   Median Size:      {self.fastcdc_stats['median_chunk']:.2f} bytes
+   Std Deviation:    {self.fastcdc_stats['std_dev']:.2f}
+"""
+            
+            accuracy = (self.fastcdc_stats['avg_chunk'] / self.fastcdc_stats['target_avg'] * 100) if self.fastcdc_stats['target_avg'] > 0 else 0
+            output += f"   Target Accuracy:  {accuracy:.1f}%\n"
+            
+            # Size distribution
+            bins = [self.fastcdc_chunker.min_size, self.fastcdc_stats['target_avg'], self.fastcdc_chunker.max_size]
+            hist, _ = np.histogram(self.fastcdc_sizes, bins=bins)
+            
+            output += f"\n📉 Size Distribution:\n"
+            output += f"   < {self.fastcdc_stats['target_avg']:,} bytes:  {hist[0]:3d} chunks ({hist[0]/self.fastcdc_stats['num_chunks']*100:.1f}%)\n"
+            output += f"   ≥ {self.fastcdc_stats['target_avg']:,} bytes:  {hist[1]:3d} chunks ({hist[1]/self.fastcdc_stats['num_chunks']*100:.1f}%)\n"
+            output += f"\n{'='*50}\n\n"
+        
+        # Display comparison if multiple algorithms were run
+        num_algos = sum([bool(self.rabin_stats), bool(self.gear_stats), bool(self.fastcdc_stats)])
+        
+        if num_algos >= 2:
+            output += f"""{'='*50}
+ALGORITHM COMPARISON
+{'='*50}
 
-📐 Standard Deviation:
-   Rabin: {self.rabin_stats['std_dev']:.2f}
-   Gear:  {self.gear_stats['std_dev']:.2f}
-   
-🎯 Target Accuracy:
-   Rabin: {(self.rabin_stats['avg_chunk'] / self.rabin_stats['target_avg'] * 100):.1f}%
-   Gear:  {(self.gear_stats['avg_chunk'] / self.gear_stats['target_avg'] * 100):.1f}%
-
-{'='*50}"""
+"""
+            
+            if self.rabin_stats:
+                output += f"📊 Rabin Fingerprinting:\n"
+                output += f"   Chunks: {self.rabin_stats['num_chunks']}, Avg: {self.rabin_stats['avg_chunk']:.2f} bytes, "
+                output += f"Accuracy: {(self.rabin_stats['avg_chunk'] / self.rabin_stats['target_avg'] * 100):.1f}%\n"
+            
+            if self.gear_stats:
+                output += f"⚙️  Gear Hashing:\n"
+                output += f"   Chunks: {self.gear_stats['num_chunks']}, Avg: {self.gear_stats['avg_chunk']:.2f} bytes, "
+                output += f"Accuracy: {(self.gear_stats['avg_chunk'] / self.gear_stats['target_avg'] * 100):.1f}%\n"
+            
+            if self.fastcdc_stats:
+                output += f"⚡ FastCDC:\n"
+                output += f"   Chunks: {self.fastcdc_stats['num_chunks']}, Avg: {self.fastcdc_stats['avg_chunk']:.2f} bytes, "
+                output += f"Accuracy: {(self.fastcdc_stats['avg_chunk'] / self.fastcdc_stats['target_avg'] * 100):.1f}%\n"
+            
+            output += f"\n📐 Standard Deviation:\n"
+            if self.rabin_stats:
+                output += f"   Rabin:   {self.rabin_stats['std_dev']:.2f}\n"
+            if self.gear_stats:
+                output += f"   Gear:    {self.gear_stats['std_dev']:.2f}\n"
+            if self.fastcdc_stats:
+                output += f"   FastCDC: {self.fastcdc_stats['std_dev']:.2f}\n"
+            
+            output += f"\n{'='*50}"""
         
         self.stats_text.insert(1.0, output)
     
@@ -295,19 +362,33 @@ COMPARISON: RABIN vs GEAR
         ax = fig.add_subplot(111)
         
         # Plot histogram(s) based on what data is available
-        if self.rabin_sizes and self.gear_sizes:
-            # Both algorithms - overlapping histograms
-            ax.hist(self.rabin_sizes, bins=20, color='skyblue', edgecolor='blue', 
-                   alpha=0.5, label='Rabin')
-            ax.hist(self.gear_sizes, bins=20, color='lightcoral', edgecolor='red', 
-                   alpha=0.5, label='Gear')
+        num_algos = sum([bool(self.rabin_sizes), bool(self.gear_sizes), bool(self.fastcdc_sizes)])
+        
+        if num_algos > 1:
+            # Multiple algorithms - overlapping histograms
+            if self.rabin_sizes:
+                ax.hist(self.rabin_sizes, bins=20, color='skyblue', edgecolor='blue', 
+                       alpha=0.5, label='Rabin')
+                ax.axvline(self.rabin_stats['avg_chunk'], color='blue', linestyle='--', 
+                          linewidth=2, label=f'Rabin Avg: {self.rabin_stats["avg_chunk"]:.0f}')
             
-            ax.axvline(self.rabin_stats['avg_chunk'], color='blue', linestyle='--', 
-                      linewidth=2, label=f'Rabin Avg: {self.rabin_stats["avg_chunk"]:.0f}')
-            ax.axvline(self.gear_stats['avg_chunk'], color='red', linestyle='--', 
-                      linewidth=2, label=f'Gear Avg: {self.gear_stats["avg_chunk"]:.0f}')
-            ax.axvline(self.rabin_stats['target_avg'], color='green', linestyle=':', 
-                      linewidth=2, label=f'Target: {self.rabin_stats["target_avg"]}')
+            if self.gear_sizes:
+                ax.hist(self.gear_sizes, bins=20, color='lightcoral', edgecolor='red', 
+                       alpha=0.5, label='Gear')
+                ax.axvline(self.gear_stats['avg_chunk'], color='red', linestyle='--', 
+                          linewidth=2, label=f'Gear Avg: {self.gear_stats["avg_chunk"]:.0f}')
+            
+            if self.fastcdc_sizes:
+                ax.hist(self.fastcdc_sizes, bins=20, color='lightgreen', edgecolor='green', 
+                       alpha=0.5, label='FastCDC')
+                ax.axvline(self.fastcdc_stats['avg_chunk'], color='green', linestyle='--', 
+                          linewidth=2, label=f'FastCDC Avg: {self.fastcdc_stats["avg_chunk"]:.0f}')
+            
+            # Show target line
+            target = self.rabin_stats.get('target_avg') if self.rabin_stats else (self.gear_stats.get('target_avg') if self.gear_stats else self.fastcdc_stats.get('target_avg'))
+            if target:
+                ax.axvline(target, color='black', linestyle=':', 
+                          linewidth=2, label=f'Target: {target}')
         elif self.rabin_sizes:
             # Only Rabin
             ax.hist(self.rabin_sizes, bins=20, color='skyblue', edgecolor='black', alpha=0.7)
@@ -322,6 +403,13 @@ COMPARISON: RABIN vs GEAR
                       linewidth=2, label=f'Actual Avg: {self.gear_stats["avg_chunk"]:.0f}')
             ax.axvline(self.gear_stats['target_avg'], color='green', linestyle='--', 
                       linewidth=2, label=f'Target Avg: {self.gear_stats["target_avg"]}')
+        elif self.fastcdc_sizes:
+            # Only FastCDC
+            ax.hist(self.fastcdc_sizes, bins=20, color='lightgreen', edgecolor='black', alpha=0.7)
+            ax.axvline(self.fastcdc_stats['avg_chunk'], color='red', linestyle='--', 
+                      linewidth=2, label=f'Actual Avg: {self.fastcdc_stats["avg_chunk"]:.0f}')
+            ax.axvline(self.fastcdc_stats['target_avg'], color='green', linestyle='--', 
+                      linewidth=2, label=f'Target Avg: {self.fastcdc_stats["target_avg"]}')
         
         ax.set_xlabel('Chunk Size (bytes)')
         ax.set_ylabel('Frequency')
@@ -337,16 +425,16 @@ COMPARISON: RABIN vs GEAR
     def display_chunks(self):
         self.chunks_text.delete(1.0, tk.END)
         
-        # Use whichever chunks are available (prefer both, then rabin, then gear)
-        if self.rabin_chunks and self.gear_chunks:
-            chunks = self.rabin_chunks
-            algo = "Rabin"
-        elif self.rabin_chunks:
+        # Use whichever chunks are available (prefer rabin, then gear, then fastcdc)
+        if self.rabin_chunks:
             chunks = self.rabin_chunks
             algo = "Rabin"
         elif self.gear_chunks:
             chunks = self.gear_chunks
             algo = "Gear"
+        elif self.fastcdc_chunks:
+            chunks = self.fastcdc_chunks
+            algo = "FastCDC"
         else:
             return
         
@@ -376,13 +464,15 @@ COMPARISON: RABIN vs GEAR
             self.chunk_spinbox.config(to=len(self.rabin_chunks)-1)
         elif self.gear_chunks:
             self.chunk_spinbox.config(to=len(self.gear_chunks)-1)
+        elif self.fastcdc_chunks:
+            self.chunk_spinbox.config(to=len(self.fastcdc_chunks)-1)
     
     def show_chunk_detail(self):
-        if not self.rabin_chunks and not self.gear_chunks:
+        if not self.rabin_chunks and not self.gear_chunks and not self.fastcdc_chunks:
             return
         
         idx = self.chunk_index_var.get()
-        chunks = self.rabin_chunks if self.rabin_chunks else self.gear_chunks
+        chunks = self.rabin_chunks if self.rabin_chunks else (self.gear_chunks if self.gear_chunks else self.fastcdc_chunks)
         
         if 0 <= idx < len(chunks):
             chunk = chunks[idx]
@@ -398,17 +488,38 @@ COMPARISON: RABIN vs GEAR
             self.chunk_detail_text.insert(1.0, detail)
     
     def clear_results(self):
+        # Clear text displays
         self.stats_text.delete(1.0, tk.END)
         self.chunks_text.delete(1.0, tk.END)
         self.chunk_detail_text.delete(1.0, tk.END)
+        
+        # Clear histogram
         for widget in self.hist_frame.winfo_children():
             widget.destroy()
+        
+        # Reset all chunker objects and data
+        self.rabin_chunker = None
+        self.gear_chunker = None
+        self.fastcdc_chunker = None
+        
+        # Clear all chunks
         self.rabin_chunks = []
         self.gear_chunks = []
+        self.fastcdc_chunks = []
+        
+        # Clear all statistics
         self.rabin_stats = {}
         self.gear_stats = {}
+        self.fastcdc_stats = {}
+        
+        # Clear all sizes
         self.rabin_sizes = []
         self.gear_sizes = []
+        self.fastcdc_sizes = []
+        
+        # Reset chunk spinbox
+        self.chunk_spinbox.config(to=0)
+        self.chunk_index_var.set(0)
 
 def main():
     root = tk.Tk()
